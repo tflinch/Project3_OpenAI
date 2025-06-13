@@ -1,59 +1,93 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
+
 """
 Prepares raw data and provides training and test datasets.
 """
 
 import argparse
-from pathlib import Path
 import os
+from pathlib import Path
 import pandas as pd
+import numpy as np
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import LabelEncoder
 import mlflow
+
 
 def parse_args():
     '''Parse input arguments'''
+    parser = argparse.ArgumentParser(description="Data preparation script for regression.")
+    parser.add_argument("--raw_data", type=str, help="Path to raw data", required=True)
+    parser.add_argument("--train_data", type=str, help="Path to save processed training data", required=True)
+    parser.add_argument("--test_data", type=str, help="Path to save processed testing data", required=True)
+    parser.add_argument("--test_train_ratio", type=float, default=0.2, help="Test-train ratio")
+    return parser.parse_args()
 
-    parser = argparse.__________("prep")  # Create an ArgumentParser object
-    parser.add_argument("--raw_data", type=_____, help="Path to raw data")  # Specify the type for raw data (str)
-    parser.add_argument("--train_data", type=_____, help="Path to train dataset")  # Specify the type for train data (str)
-    parser.add_argument("--test_data", type=_____, help="Path to test dataset")  # Specify the type for test data (str)
-    parser.add_argument("--test_train_ratio", type=______, default=_____, help="Test-train ratio")  # Specify the type (float) and default value (0.2) for test-train ratio
-    args = parser.parse_args()
 
-    return args
-
-def main(args):  # Write the function name for the main data preparation logic
+def main(args):
     '''Read, preprocess, split, and save datasets'''
 
-    # Reading Data
-    df = pd.read_csv(args.raw_data)
+    print(f"Reading data from: {args.raw_data}")
+    df = pd.read_csv(args.raw_data, delimiter='\t')  # Change delimiter if needed
 
-    # ------- WRITE YOUR CODE HERE -------
+    # === Data Preprocessing ===
+    # Fill missing numeric values
+    numerical_cols = df.select_dtypes(include=np.number).columns
+    for col in numerical_cols:
+        if df[col].isnull().any():
+            df[col] = df[col].fillna(df[col].mean())
 
-    # Step 1: Perform label encoding to convert categorical features into numerical values for model compatibility.  
-    # Step 2: Split the dataset into training and testing sets using train_test_split with specified test size and random state.  
-    # Step 3: Save the training and testing datasets as CSV files in separate directories for easier access and organization.  
-    # Step 4: Log the number of rows in the training and testing datasets as metrics for tracking and evaluation.  
+    # One-hot encode categorical columns
+    categorical_cols = df.select_dtypes(include='object').columns
+    df = pd.get_dummies(df, columns=categorical_cols, dummy_na=False)
+
+    # Assume 'price' is the target column for regression
+    if 'price' not in df.columns:
+        raise ValueError("Target column 'price' not found in dataset.")
+
+    X = df.drop('price', axis=1)
+    y = df['price']
+
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=args.test_train_ratio, random_state=42
+    )
+
+    train_df = pd.concat([X_train, y_train], axis=1)
+    test_df = pd.concat([X_test, y_test], axis=1)
+
+    # Ensure output directories exist
+    os.makedirs(args.train_data, exist_ok=True)
+    os.makedirs(args.test_data, exist_ok=True)
+
+    # Write to CSV
+    train_output_path = os.path.join(args.train_data, 'train.csv')
+    test_output_path = os.path.join(args.test_data, 'test.csv')
+    train_df.to_csv(train_output_path, index=False)
+    test_df.to_csv(test_output_path, index=False)
+
+    # === MLflow Logging ===
+    mlflow.log_metric("train_rows", train_df.shape[0])
+    mlflow.log_metric("test_rows", test_df.shape[0])
+
+    print(f"Training data saved to: {train_output_path}")
+    print(f"Testing data saved to: {test_output_path}")
 
 
 if __name__ == "__main__":
     mlflow.start_run()
 
-    # Parse Arguments
-    args = _______()  # Call the function to parse arguments
+    args = parse_args()
 
     lines = [
-        f"Raw data path: {args._______}",  # Print the raw_data path
-        f"Train dataset output path: {args._______}",  # Print the train_data path
-        f"Test dataset path: {args._______}",  # Print the test_data path
-        f"Test-train ratio: {args._______}",  # Print the test_train_ratio
+        f"Raw data path: {args.raw_data}",
+        f"Train dataset output path: {args.train_data}",
+        f"Test dataset path: {args.test_data}",
+        f"Test-train ratio: {args.test_train_ratio}",
     ]
 
     for line in lines:
         print(line)
-    
+
     main(args)
 
     mlflow.end_run()
