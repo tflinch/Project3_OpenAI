@@ -13,6 +13,9 @@ from sklearn.tree import DecisionTreeRegressor
 from sklearn.metrics import mean_squared_error, r2_score
 import mlflow
 import mlflow.sklearn
+ import shutil
+    from mlflow.tracking.artifact_utils import _download_artifact_from_uri
+    from pathlib import Path
 
 def parse_args():
     '''Parse input arguments'''
@@ -87,22 +90,29 @@ def main(args):
     mlflow.log_metric("mse", mse)
     mlflow.log_metric("r2", r2)
 
-    # ✅ Correct way to log model to MLflow and save to expected output path
+     # ✅ Correct way to log model to MLflow and save to expected output path
     mlflow.sklearn.log_model(
         sk_model=model,
-        artifact_path="model",  # This name is arbitrary
-        registered_model_name=None  # We don't register here
+        artifact_path="model",  # Logged under 'model' directory
+        registered_model_name=None
     )
 
-    # Now move the logged artifact to the desired output path
+    # ✅ Now move the logged artifact to the desired output path
     import shutil
     from mlflow.tracking.artifact_utils import _download_artifact_from_uri
+    from pathlib import Path
 
     model_uri = "runs:/" + mlflow.active_run().info.run_id + "/model"
     local_path = _download_artifact_from_uri(model_uri)
-    shutil.copytree(local_path, args.model_output, dirs_exist_ok=True)
 
-    print(f"✅ MLflow model directory copied to output path: {args.model_output}")
+    # Ensure target directory exists
+    final_model_path = Path(args.model_output)
+    final_model_path.mkdir(parents=True, exist_ok=True)
+
+    # Copy entire model folder (contains MLmodel, conda.yaml, etc.)
+    shutil.copytree(local_path, final_model_path, dirs_exist_ok=True)
+
+    print(f"✅ MLflow model directory copied to output path: {final_model_path}")
 
     mlflow.end_run()
 
