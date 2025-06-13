@@ -5,59 +5,104 @@ Trains ML model using training dataset and evaluates using test dataset. Saves t
 """
 
 import argparse
-from pathlib import Path
+import os
 import pandas as pd
+from pathlib import Path
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.metrics import mean_squared_error
+from sklearn.tree import DecisionTreeRegressor
+from sklearn.metrics import mean_squared_error, r2_score
 import mlflow
 import mlflow.sklearn
 
 def parse_args():
     '''Parse input arguments'''
-
     parser = argparse.ArgumentParser("train")
-    
-    # -------- WRITE YOUR CODE HERE --------
-    
-    # Step 1: Define arguments for train data, test data, model output, and RandomForest hyperparameters. Specify their types and defaults.  
 
+    parser.add_argument("--train_data", type=str, required=True, help="Path to train data")
+    parser.add_argument("--test_data", type=str, required=True, help="Path to test data")
+    parser.add_argument("--model_output", type=str, required=True, help="Path to save output model")
 
-    args = parser.parse_args()
+    # Model hyperparameters
+    parser.add_argument("--model_type", type=str, default="random_forest", choices=["random_forest", "decision_tree"],
+                        help="Model type to use for regression")
+    parser.add_argument("--n_estimators", type=int, default=100, help="Number of estimators (for RandomForest)")
+    parser.add_argument("--max_depth", type=int, default=None, help="Maximum depth of the tree")
+    parser.add_argument("--criterion", type=str, default="squared_error",
+                        help="Function to measure the quality of a split (for DecisionTree)")
 
-    return args
+    return parser.parse_args()
+
+def select_first_file(path):
+    """Selects the first file in a folder, assuming there's only one file."""
+    files = os.listdir(path)
+    if not files:
+        raise FileNotFoundError(f"No files found in: {path}")
+    return os.path.join(path, files[0])
 
 def main(args):
-    '''Read train and test datasets, train model, evaluate model, save trained model'''
-
-    # -------- WRITE YOUR CODE HERE --------
-
-    # Step 2: Read the train and test datasets from the provided paths using pandas. Replace '_______' with appropriate file paths and methods.  
-    # Step 3: Split the data into features (X) and target (y) for both train and test datasets. Specify the target column name.  
-    # Step 4: Initialize the RandomForest Regressor with specified hyperparameters, and train the model using the training data.  
-    # Step 5: Log model hyperparameters like 'n_estimators' and 'max_depth' for tracking purposes in MLflow.  
-    # Step 6: Predict target values on the test dataset using the trained model, and calculate the mean squared error.  
-    # Step 7: Log the MSE metric in MLflow for model evaluation, and save the trained model to the specified output path.  
-
-
-if __name__ == "__main__":
-    
+    '''Train and evaluate the model'''
     mlflow.start_run()
 
-    # Parse Arguments
-    args = parse_args()
+    # Load datasets
+    train_df = pd.read_csv(select_first_file(args.train_data))
+    test_df = pd.read_csv(select_first_file(args.test_data))
 
-    lines = [
-        f"Train dataset input path: {args.train_data}",
-        f"Test dataset input path: {args.test_data}",
-        f"Model output path: {args.model_output}",
-        f"Number of Estimators: {args.n_estimators}",
-        f"Max Depth: {args.max_depth}"
-    ]
+    # Strip column names of whitespace
+    train_df.columns = train_df.columns.str.strip()
+    test_df.columns = test_df.columns.str.strip()
 
-    for line in lines:
-        print(line)
+    print("Columns in train_df:", train_df.columns.tolist())
 
-    main(args)
+    target_col = "price"
+    if target_col not in train_df.columns or target_col not in test_df.columns:
+        raise ValueError(f"Expected target column '{target_col}' not found in dataset.")
+
+    X_train = train_df.drop(target_col, axis=1).values
+    y_train = train_df[target_col].values
+
+    X_test = test_df.drop(target_col, axis=1).values
+    y_test = test_df[target_col].values
+
+    # Initialize and train the model
+    if args.model_type == "random_forest":
+        model = RandomForestRegressor(n_estimators=args.n_estimators, max_depth=args.max_depth, random_state=42)
+        mlflow.log_param("n_estimators", args.n_estimators)
+    else:
+        model = DecisionTreeRegressor(criterion=args.criterion, max_depth=args.max_depth, random_state=42)
+        mlflow.log_param("criterion", args.criterion)
+
+    mlflow.log_param("model_type", args.model_type)
+    mlflow.log_param("max_depth", args.max_depth)
+
+    model.fit(X_train, y_train)
+    predictions = model.predict(X_test)
+
+    # Evaluate
+    mse = mean_squared_error(y_test, predictions)
+    r2 = r2_score(y_test, predictions)
+
+    print(f"📊 Mean Squared Error: {mse:.2f}")
+    print(f"📊 R^2 Score: {r2:.2f}")
+
+    mlflow.log_metric("mse", mse)
+    mlflow.log_metric("r2", r2)
+
+    # Save model
+    os.makedirs(args.model_output, exist_ok=True)
+    mlflow.sklearn.save_model(model, args.model_output)
+    print(f"✅ Model saved to: {args.model_output}")
 
     mlflow.end_run()
 
+if __name__ == "__main__":
+    args = parse_args()
+
+    print(f"Train dataset path: {args.train_data}")
+    print(f"Test dataset path: {args.test_data}")
+    print(f"Model output path: {args.model_output}")
+    print(f"Model type: {args.model_type}")
+    print(f"n_estimators: {args.n_estimators}")
+    print(f"max_depth: {args.max_depth}")
+    print(f"criterion: {args.criterion}")
+
+    main(args)
