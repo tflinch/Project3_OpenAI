@@ -15,7 +15,7 @@ inputs:
     default: 5
 outputs:
   model_output:
-    type: mlflow_model
+    type: uri_folder
 code: ../../../data-science/src
 command: >-
   python train.py 
