@@ -87,10 +87,22 @@ def main(args):
     mlflow.log_metric("mse", mse)
     mlflow.log_metric("r2", r2)
 
-    # Save model
-    os.makedirs(args.model_output, exist_ok=True)
-    mlflow.sklearn.save_model(model, args.model_output)
-    print(f"✅ Model saved to: {args.model_output}")
+    # ✅ Correct way to log model to MLflow and save to expected output path
+    mlflow.sklearn.log_model(
+        sk_model=model,
+        artifact_path="model",  # This name is arbitrary
+        registered_model_name=None  # We don't register here
+    )
+
+    # Now move the logged artifact to the desired output path
+    import shutil
+    from mlflow.tracking.artifact_utils import _download_artifact_from_uri
+
+    model_uri = "runs:/" + mlflow.active_run().info.run_id + "/model"
+    local_path = _download_artifact_from_uri(model_uri)
+    shutil.copytree(local_path, args.model_output, dirs_exist_ok=True)
+
+    print(f"✅ MLflow model directory copied to output path: {args.model_output}")
 
     mlflow.end_run()
 
