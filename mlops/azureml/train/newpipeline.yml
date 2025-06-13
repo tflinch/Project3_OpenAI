@@ -53,7 +53,7 @@ jobs:
       model_output:
         type: uri_folder
     sampling_algorithm: random
-    trial: ../../../data-science/train.yml
+    trial: ./train.yml
     search_space:
       criterion:
         type: choice
