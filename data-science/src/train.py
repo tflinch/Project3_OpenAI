@@ -108,7 +108,7 @@ def main(args):
         src_path = Path(local_path) / item
         dst_path = final_model_path / item
         if src_path.is_dir():
-            shutil.copytree(src_path, dst_path, dirs_exist_ok=True)
+            shutil.copytree(Path(local_path) / "model", final_model_path, dirs_exist_ok=True)
         else:
             shutil.copy2(src_path, dst_path)
 
