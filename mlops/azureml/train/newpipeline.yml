@@ -8,6 +8,9 @@ inputs:
   input:
     type: uri_file
     path: azureml:machine-failure-data@latest
+  model_name:
+    type: string
+    default: machine_failure_prediction_model
 
 outputs:
   train_data:
@@ -48,9 +51,9 @@ jobs:
       test_data: ${{parent.jobs.prep_data.outputs.test_data}}
     outputs:
       model_output:
-        type: uri_folder  # CHANGED from `mlflow_model`
+        type: uri_folder
     sampling_algorithm: random
-    trial: ./train.yml
+    trial: ../../../data-science/train.yml
     search_space:
       criterion:
         type: choice
@@ -77,7 +80,7 @@ jobs:
       --model_info_output_path ${{outputs.model_info_output_path}}
     environment: azureml:machine-failure-train-env@latest
     inputs:
-      model_name: "machine_failure_prediction_model"
+      model_name: ${{parent.inputs.model_name}}
       model_path: ${{parent.jobs.sweep_step.outputs.model_output}}
     outputs:
       model_info_output_path: ${{parent.outputs.model_info_output_path}}
