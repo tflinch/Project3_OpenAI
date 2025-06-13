@@ -13,6 +13,9 @@ inputs:
   max_depth:
     type: integer
     default: 5
+  model_type:
+    type: string
+    default: decision_tree
 outputs:
   model_output:
     type: uri_folder
@@ -24,4 +27,5 @@ command: >-
   --criterion ${{inputs.criterion}}
   --max_depth ${{inputs.max_depth}}
   --model_output ${{outputs.model_output}}
+  --model_type ${{inputs.model_type}}
 environment: azureml:machine-failure-train-env@latest
