@@ -1,5 +1,6 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
+
 """
 Trains ML model using training dataset and evaluates using test dataset. Saves trained model.
 """
@@ -13,9 +14,8 @@ from sklearn.tree import DecisionTreeRegressor
 from sklearn.metrics import mean_squared_error, r2_score
 import mlflow
 import mlflow.sklearn
- import shutil
-    from mlflow.tracking.artifact_utils import _download_artifact_from_uri
-    from pathlib import Path
+import shutil
+from mlflow.tracking.artifact_utils import _download_artifact_from_uri
 
 def parse_args():
     '''Parse input arguments'''
@@ -90,29 +90,39 @@ def main(args):
     mlflow.log_metric("mse", mse)
     mlflow.log_metric("r2", r2)
 
-     # ✅ Correct way to log model to MLflow and save to expected output path
+    # Log model to MLflow
     mlflow.sklearn.log_model(
         sk_model=model,
-        artifact_path="model",  # Logged under 'model' directory
-        registered_model_name=None
+        artifact_path="model"
     )
 
-    # ✅ Now move the logged artifact to the desired output path
-    import shutil
-    from mlflow.tracking.artifact_utils import _download_artifact_from_uri
-    from pathlib import Path
-
+    # Copy model from MLflow run directory to args.model_output
     model_uri = "runs:/" + mlflow.active_run().info.run_id + "/model"
     local_path = _download_artifact_from_uri(model_uri)
 
-    # Ensure target directory exists
     final_model_path = Path(args.model_output)
     final_model_path.mkdir(parents=True, exist_ok=True)
 
-    # Copy entire model folder (contains MLmodel, conda.yaml, etc.)
-    shutil.copytree(local_path, final_model_path, dirs_exist_ok=True)
+    # Copy contents of MLflow model folder into the output directory
+    for item in os.listdir(local_path):
+        src_path = Path(local_path) / item
+        dst_path = final_model_path / item
+        if src_path.is_dir():
+            shutil.copytree(src_path, dst_path, dirs_exist_ok=True)
+        else:
+            shutil.copy2(src_path, dst_path)
 
     print(f"✅ MLflow model directory copied to output path: {final_model_path}")
+
+    # Debug: Print contents of model output folder
+    print("📁 Output model directory contents:")
+    for root, dirs, files in os.walk(final_model_path):
+        level = root.replace(str(final_model_path), '').count(os.sep)
+        indent = ' ' * 4 * level
+        print(f"{indent}{os.path.basename(root)}/")
+        subindent = ' ' * 4 * (level + 1)
+        for f in files:
+            print(f"{subindent}{f}")
 
     mlflow.end_run()
 
