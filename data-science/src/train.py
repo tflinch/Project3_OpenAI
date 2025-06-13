@@ -103,14 +103,7 @@ def main(args):
     final_model_path = Path(args.model_output)
     final_model_path.mkdir(parents=True, exist_ok=True)
 
-    # Copy contents of MLflow model folder into the output directory
-    for item in os.listdir(local_path):
-        src_path = Path(local_path) / item
-        dst_path = final_model_path / item
-        if src_path.is_dir():
-            shutil.copytree(Path(local_path) / "model", final_model_path, dirs_exist_ok=True)
-        else:
-            shutil.copy2(src_path, dst_path)
+    shutil.copytree(local_path, final_model_path, dirs_exist_ok=True)
 
     print(f"✅ MLflow model directory copied to output path: {final_model_path}")
 
